@@ -48,7 +48,7 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 
 
 # Training
-def train(net, epoch, rankfilters=False):
+def train(rankfilters=False):
     net.train()
     train_loss = 0
     correct = 0
@@ -67,6 +67,10 @@ def train(net, epoch, rankfilters=False):
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
+            try:
+                optimizer.step()
+            except TypeError:
+                pass
 
         train_loss += loss.data[0]
         _, predicted = torch.max(outputs.data, 1)
@@ -76,10 +80,10 @@ def train(net, epoch, rankfilters=False):
         # progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
         #              % (train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
     print('Train Loss: %.3f | Acc: %.3f%% (%d/%d)'
-          % (train_loss/(batch_idx+1), 100. * correct / total, correct, total))
+          % (train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
 
-def test(net, epoch):
+def test():
     global best_acc
     net.eval()
     test_loss = 0
@@ -97,10 +101,8 @@ def test(net, epoch):
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
 
-        # progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-        #              % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
     print('Test Loss: %.3f | Acc: %.3f%% (%d/%d)'
-          % (test_loss/(batch_idx+1), 100. * correct / total, correct, total))
+          % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
     # Save checkpoint.
     acc = 100. * correct / total
@@ -108,15 +110,18 @@ def test(net, epoch):
         print('Saving..')
         try:
             state = {
-                'net': net.module if isinstance(net,torch.nn.DataParallel) else net,
+                'net': net.module if isinstance(net, torch.nn.DataParallel) else net,
                 'acc': acc,
-                'epoch': epoch,
+                # 'epoch': epoch if 'epoch' in globals(),
             }
         except:
             pass
         if not os.path.isdir('checkpoint'):
             os.mkdir('checkpoint')
-        torch.save(state, './checkpoint/ckpt.t7')
+        if not args.prune:
+            torch.save(state, './checkpoint/ckpt.train')
+        else:
+            torch.save(state, './checkpoint/ckpt.prune')
         best_acc = acc
 
 
@@ -207,7 +212,7 @@ class FilterPrunner:
 
     def get_candidates_to_prune(self, num_filters_to_prune):
         self.reset()
-        train(self.model, epoch=1, rankfilters=True)
+        train(rankfilters=True)
         self.normalize_ranks_per_layer()
 
         return self.get_prunning_plan(num_filters_to_prune)
@@ -221,9 +226,9 @@ class FilterPrunner:
 
     def prune(self):
         # Get the accuracy before prunning
-        test(self.model, epoch=1)
+        test()
 
-        # train(self.model, epoch=1, rankfilters=True)
+        # train(rankfilters=True)
 
         # Make sure all the layers are trainable
         for param in self.model.features.parameters():
@@ -247,25 +252,25 @@ class FilterPrunner:
                 num_layers_prunned[layer_index] = num_layers_prunned[layer_index] + 1
 
             print("Layers that will be prunned", num_layers_prunned)
-            print("Prunning filters.. ")
+            print("..............Prunning filters............. ")
             model = self.model.cpu()
             for layer_index, filter_index in prune_targets:
                 model = prune_conv_layer(model, layer_index, filter_index)
 
             self.model = model.cuda()
-            net = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
-            cudnn.benchmark = True
+            # net = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
+            # cudnn.benchmark = True
 
-            print("%.3f%% Filters prunned." % float(100 * float(prunner.total_num_filters()) / number_of_filters))
-            test(net, epoch=1)
+            print("%.3f%% Filters remain." % float(100 * float(prunner.total_num_filters()) / number_of_filters))
+            # test()
             print("Fine tuning to recover from prunning iteration.")
-            optimizer = optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9)
             for epoch in range(1):
-                train(self.model, epoch)
+                train()
+            test()
 
         print("Finished. Going to fine tune the model a bit more")
         for epoch in range(5):
-            train(self.model, epoch)
+            train()
         torch.save(self.model, "model_prunned")
 
 
@@ -287,10 +292,10 @@ if __name__ == '__main__':
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
         assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-        checkpoint = torch.load('./checkpoint/ckpt.t7')
+        checkpoint = torch.load('./checkpoint/ckpt.prune')
         net = checkpoint['net']
         best_acc = checkpoint['acc']
-        start_epoch = checkpoint['epoch']
+        # start_epoch = checkpoint['epoch']
     else:
         print('==> Building model..')
         net = VGG('VGG16')
@@ -313,12 +318,12 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
-    prunner = FilterPrunner(net.module if isinstance(net,torch.nn.DataParallel) else net)
+    prunner = FilterPrunner(net.module if isinstance(net, torch.nn.DataParallel) else net)
 
     if args.prune:
         prunner.prune()
     else:
-        for epoch in range(start_epoch, start_epoch + 20):
+        for epoch in range(20):# start_epoch, start_epoch + 20):
             print('\nEpoch: %d' % epoch)
-            train(net, epoch)
-            test(net, epoch)
+            train()
+            test()

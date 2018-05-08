@@ -49,8 +49,10 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 
 
 # Training
-def train(rankfilters=False):
-    net.train()
+def train(optimizer=None, rankfilters=False):
+    if optimizer is None:
+        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+    # net.train()
     train_loss = 0
     correct = 0
     total = 0
@@ -68,10 +70,10 @@ def train(rankfilters=False):
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
-            try:
-                optimizer.step()
-            except TypeError:
-                pass
+            # try:
+            #     optimizer.step()
+            # except TypeError:
+            #     pass
 
         train_loss += loss.data[0]
         _, predicted = torch.max(outputs.data, 1)
@@ -84,9 +86,10 @@ def train(rankfilters=False):
           % (train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
 
+# test
 def test():
     global best_acc
-    net.eval()
+    # net.eval()
     test_loss = 0
     correct = 0
     total = 0
@@ -102,30 +105,38 @@ def test():
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
 
-    print('Test Loss: %.3f | Acc: %.3f%% (%d/%d)'
+    print('Test  Loss: %.3f | Acc: %.3f%% (%d/%d)'
           % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
     # Save checkpoint.
     acc = 100. * correct / total
     # if acc > best_acc:
+    # save(acc, activation_index)
+    best_acc = acc
+
+    return acc
+
+
+# save
+def save(acc, activation_index=-1):
     print('Saving..')
     try:
         state = {
             'net': net.module if isinstance(net, torch.nn.DataParallel) else net,
             'acc': acc,
+            'activation_index': activation_index,
             # 'epoch': epoch if 'epoch' in globals(),
         }
     except:
         pass
     if not os.path.isdir('checkpoint'):
         os.mkdir('checkpoint')
-    if args.prune or args.prune_layer:
+    if args.prune:
         torch.save(state, './checkpoint/ckpt.prune')
+    elif args.prune_layer and activation_index != -1:
+        torch.save(state, './checkpoint/ckpt.prune_layer_%d' % activation_index)
     else:
-        torch.save(state, './checkpoint/ckpt.prune')
-    best_acc = acc
-
-    return acc
+        torch.save(state, './checkpoint/ckpt.train')
 
 
 class FilterPrunner:
@@ -243,7 +254,7 @@ class FilterPrunner:
 
         return filters
 
-    def prune(self, activation_index):
+    def prune(self, activation_index=-1):
         # Get the accuracy before prunning
         acc_pre_prune = test()
         acc = acc_pre_prune
@@ -256,7 +267,10 @@ class FilterPrunner:
 
         number_of_filters = prunner.total_num_filters(activation_index)
 
-        num_filters_to_prune_per_iteration = 8
+        if activation_index == -1:
+            num_filters_to_prune_per_iteration = 512
+        else:
+            num_filters_to_prune_per_iteration = int(number_of_filters / 8)
         # iterations = int(float(number_of_filters) / num_filters_to_prune_per_iteration)
         #
         # iterations = int(iterations * 2.0 / 3)
@@ -264,7 +278,7 @@ class FilterPrunner:
         # print("Number of prunning iterations to reduce 67% filters", iterations)
 
         # for _ in range(iterations):
-        while acc > acc_pre_prune * 0.9:
+        while acc > acc_pre_prune * 0.9 and prunner.total_num_filters(activation_index) / number_of_filters > 0.2:
             # print("Ranking filters.. ")
 
             prune_targets = prunner.get_candidates_to_prune(num_filters_to_prune_per_iteration, activation_index)
@@ -281,21 +295,21 @@ class FilterPrunner:
                 model = prune_conv_layer(model, layer_index, filter_index)
 
             self.model = model.cuda()
-            # net = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
-            # cudnn.benchmark = True
+            optimizer = optim.SGD(self.model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
-            print("%d / %d Filters remain." % (number_of_filters, prunner.total_num_filters(activation_index)))
+            print("%d / %d Filters remain." % (prunner.total_num_filters(activation_index), number_of_filters))
             # test()
             print("Fine tuning to recover from prunning iteration.")
             for epoch in range(1):
-                train()
+                train(optimizer)
             acc = test()
             pass
 
         print("Finished. Going to fine tune the model a bit more")
         for epoch in range(5):
-            train()
-        torch.save(self.model, "model_prunned")
+            train(optimizer)
+        test()
+        pass
 
 
 def get_args():
@@ -317,10 +331,7 @@ if __name__ == '__main__':
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
         assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-        if args.resume:
-            checkpoint = torch.load('./checkpoint/ckpt.train')
-        else:
-            checkpoint = torch.load('./checkpoint/ckpt.train')
+        checkpoint = torch.load('./checkpoint/ckpt.train')
         net = checkpoint['net']
         best_acc = checkpoint['acc']
         # start_epoch = checkpoint['epoch']
@@ -353,10 +364,15 @@ if __name__ == '__main__':
         prunner.prune(activation_index=-1)
     elif args.prune_layer:
         activation_index_max = prunner.get_activation_index_max()
-        for activation_index in range(activation_index_max):
+        for activation_index in range(1):  # range(activation_index_max):
             prunner.prune(activation_index)
+            prunner.prune()
+            acc = test()
+            save(acc, activation_index)
+            pass
     else:
         for epoch in range(20):  # start_epoch, start_epoch + 20):
             print('\nEpoch: %d' % epoch)
             train()
-            test()
+            acc = test()
+        save(acc)

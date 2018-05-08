@@ -23,6 +23,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 use_cuda = torch.cuda.is_available()
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
+total_filter_num_pre_prune = 0
 
 # Data
 print('==> Preparing data..')
@@ -106,23 +107,25 @@ def test():
 
     # Save checkpoint.
     acc = 100. * correct / total
-    if acc > best_acc:
-        print('Saving..')
-        try:
-            state = {
-                'net': net.module if isinstance(net, torch.nn.DataParallel) else net,
-                'acc': acc,
-                # 'epoch': epoch if 'epoch' in globals(),
-            }
-        except:
-            pass
-        if not os.path.isdir('checkpoint'):
-            os.mkdir('checkpoint')
-        if not args.prune:
-            torch.save(state, './checkpoint/ckpt.train')
-        else:
-            torch.save(state, './checkpoint/ckpt.prune')
-        best_acc = acc
+    # if acc > best_acc:
+    print('Saving..')
+    try:
+        state = {
+            'net': net.module if isinstance(net, torch.nn.DataParallel) else net,
+            'acc': acc,
+            # 'epoch': epoch if 'epoch' in globals(),
+        }
+    except:
+        pass
+    if not os.path.isdir('checkpoint'):
+        os.mkdir('checkpoint')
+    if args.prune or args.prune_layer:
+        torch.save(state, './checkpoint/ckpt.prune')
+    else:
+        torch.save(state, './checkpoint/ckpt.prune')
+    best_acc = acc
+
+    return acc
 
 
 class FilterPrunner:
@@ -154,6 +157,13 @@ class FilterPrunner:
 
         return self.model.classifier(x.view(x.size(0), -1))
 
+    def get_activation_index_max(self):
+        activation_index = 0
+        for layer, (name, module) in enumerate(self.model.features._modules.items()):
+            if isinstance(module, torch.nn.modules.conv.Conv2d):
+                activation_index += 1
+        return activation_index
+
     def compute_rank(self, grad):
         activation_index = len(self.activations) - self.grad_index - 1
         activation = self.activations[activation_index]
@@ -173,12 +183,15 @@ class FilterPrunner:
         self.filter_ranks[activation_index] += values
         self.grad_index += 1
 
-    def lowest_ranking_filters(self, num):
+    def lowest_ranking_filters(self, num, activation_index):
         data = []
-        for i in sorted(self.filter_ranks.keys()):
-            for j in range(self.filter_ranks[i].size(0)):
-                data.append((self.activation_to_layer[i], j, self.filter_ranks[i][j]))
-
+        if activation_index == -1:
+            for i in sorted(self.filter_ranks.keys()):
+                for j in range(self.filter_ranks[i].size(0)):
+                    data.append((self.activation_to_layer[i], j, self.filter_ranks[i][j]))
+        else:
+            for j in range(self.filter_ranks[activation_index].size(0)):
+                data.append((self.activation_to_layer[activation_index], j, self.filter_ranks[activation_index][j]))
         return nsmallest(num, data, itemgetter(2))  # find the minimum of data[_][2], aka, self.filter_ranks[i][j]
 
     def normalize_ranks_per_layer(self):
@@ -187,8 +200,8 @@ class FilterPrunner:
             v = v / np.sqrt(torch.sum(v * v))
             self.filter_ranks[i] = v.cpu()
 
-    def get_prunning_plan(self, num_filters_to_prune):
-        filters_to_prune = self.lowest_ranking_filters(num_filters_to_prune)
+    def get_prunning_plan(self, num_filters_to_prune, activation_index):
+        filters_to_prune = self.lowest_ranking_filters(num_filters_to_prune, activation_index)
 
         # After each of the k filters are prunned,
         # the filter index of the next filters change since the model is smaller.
@@ -210,23 +223,30 @@ class FilterPrunner:
 
         return filters_to_prune
 
-    def get_candidates_to_prune(self, num_filters_to_prune):
+    def get_candidates_to_prune(self, num_filters_to_prune, activation_index):
         self.reset()
         train(rankfilters=True)
         self.normalize_ranks_per_layer()
 
-        return self.get_prunning_plan(num_filters_to_prune)
+        return self.get_prunning_plan(num_filters_to_prune, activation_index)
 
-    def total_num_filters(self):
+    def total_num_filters(self, activation_index):
         filters = 0
+        i = 0
         for name, module in list(self.model.features._modules.items()):
             if isinstance(module, torch.nn.modules.conv.Conv2d):
-                filters = filters + module.out_channels
+                if activation_index == -1:
+                    filters = filters + module.out_channels
+                elif activation_index == i:
+                    filters = filters + module.out_channels
+                i = i + 1
+
         return filters
 
-    def prune(self):
+    def prune(self, activation_index):
         # Get the accuracy before prunning
-        test()
+        acc_pre_prune = test()
+        acc = acc_pre_prune
 
         # train(rankfilters=True)
 
@@ -234,17 +254,20 @@ class FilterPrunner:
         for param in self.model.features.parameters():
             param.requires_grad = True
 
-        number_of_filters = prunner.total_num_filters()
-        num_filters_to_prune_per_iteration = 256
-        iterations = int(float(number_of_filters) / num_filters_to_prune_per_iteration)
+        number_of_filters = prunner.total_num_filters(activation_index)
 
+        num_filters_to_prune_per_iteration = 8
+        # iterations = int(float(number_of_filters) / num_filters_to_prune_per_iteration)
+        #
         # iterations = int(iterations * 2.0 / 3)
+        #
+        # print("Number of prunning iterations to reduce 67% filters", iterations)
 
-        print("Number of prunning iterations to reduce 100% filters", iterations)
+        # for _ in range(iterations):
+        while acc > acc_pre_prune * 0.9:
+            # print("Ranking filters.. ")
 
-        for _ in range(iterations):
-            print("Ranking filters.. ")
-            prune_targets = prunner.get_candidates_to_prune(num_filters_to_prune_per_iteration)
+            prune_targets = prunner.get_candidates_to_prune(num_filters_to_prune_per_iteration, activation_index)
             num_layers_prunned = {}  # filters to be pruned in each layer
             for layer_index, filter_index in prune_targets:
                 if layer_index not in num_layers_prunned:
@@ -261,12 +284,13 @@ class FilterPrunner:
             # net = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
             # cudnn.benchmark = True
 
-            print("%.3f%% Filters remain." % float(100 * float(prunner.total_num_filters()) / number_of_filters))
+            print("%d / %d Filters remain." % (number_of_filters, prunner.total_num_filters(activation_index)))
             # test()
             print("Fine tuning to recover from prunning iteration.")
             for epoch in range(1):
                 train()
-            test()
+            acc = test()
+            pass
 
         print("Finished. Going to fine tune the model a bit more")
         for epoch in range(5):
@@ -280,6 +304,7 @@ def get_args():
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument("--train", dest="train", action="store_true")
     parser.add_argument("--prune", dest="prune", action="store_true")
+    parser.add_argument("--prune_layer", dest="prune_layer", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -288,11 +313,14 @@ if __name__ == '__main__':
     args = get_args()
 
     # Model
-    if args.resume or args.prune:
+    if args.resume or args.prune or args.prune_layer:
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
         assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-        checkpoint = torch.load('./checkpoint/ckpt.prune')
+        if args.resume:
+            checkpoint = torch.load('./checkpoint/ckpt.train')
+        else:
+            checkpoint = torch.load('./checkpoint/ckpt.train')
         net = checkpoint['net']
         best_acc = checkpoint['acc']
         # start_epoch = checkpoint['epoch']
@@ -319,11 +347,16 @@ if __name__ == '__main__':
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
     prunner = FilterPrunner(net.module if isinstance(net, torch.nn.DataParallel) else net)
+    total_filter_num_pre_prune = prunner.total_num_filters(activation_index=-1)
 
     if args.prune:
-        prunner.prune()
+        prunner.prune(activation_index=-1)
+    elif args.prune_layer:
+        activation_index_max = prunner.get_activation_index_max()
+        for activation_index in range(activation_index_max):
+            prunner.prune(activation_index)
     else:
-        for epoch in range(20):# start_epoch, start_epoch + 20):
+        for epoch in range(20):  # start_epoch, start_epoch + 20):
             print('\nEpoch: %d' % epoch)
             train()
             test()

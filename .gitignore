@@ -7,10 +7,10 @@ data/cifar-10-batches-py/data_batch_1
 .idea/dictionaries/Johnny.xml
 *.xml
 *.iml
-data/cifar-10-batches-py/data_batch_2
-data/cifar-10-batches-py/data_batch_3
-data/cifar-10-batches-py/data_batch_4
-data/cifar-10-batches-py/data_batch_5
-data/cifar-10-batches-py/readme.html
-data/cifar-10-batches-py/test_batch
-*.train
+*.pyc
+data/
+train/
+checkpoint/
+checkpoint_backup/
+
+~$log.xlsx

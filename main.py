@@ -39,10 +39,10 @@ transform_test = transforms.Compose([
 ])
 
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=4)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=8)
 
 testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=False, num_workers=4)
+testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=False, num_workers=8)
 
 classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
@@ -127,6 +127,7 @@ def test(log_index=-1):
 def save(acc, conv_index=-1):
     print('Saving..')
     try:
+        # save the cpu model
         model = net.module if isinstance(net, torch.nn.DataParallel) else net
         state = {
             'net': model.cpu() if use_cuda else model,
@@ -144,6 +145,10 @@ def save(acc, conv_index=-1):
         torch.save(state, './checkpoint/ckpt.prune_layer_%d' % conv_index)
     else:
         torch.save(state, './checkpoint/ckpt.train')
+
+    # restore the cuda or cpu model
+    if use_cuda:
+        net.cuda()
 
 
 class FilterPruner:
@@ -440,10 +445,13 @@ if __name__ == '__main__':
             save(acc, conv_index)
             pass
     elif args.train or args.resume:
-        for epoch in range(20):  # start_epoch, start_epoch + 20):
+        for epoch in range(100):  # start_epoch, start_epoch + 20):
             print('\nEpoch: %d' % epoch)
             train()
             acc = test()
+            if epoch % 10 ==0:
+                save(acc)
+                pass
         save(acc)
     elif args.test_pruned:
         cfg = pruner.get_cfg()
@@ -463,7 +471,6 @@ if __name__ == '__main__':
                 # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
                 # cudnn.benchmark = True
 
-            # net = net.module if isinstance(net, torch.nn.DataParallel) else net
             # create new pruner in each iteration
             pruner = FilterPruner(net.module if isinstance(net, torch.nn.DataParallel) else net)
             total_filter_num_pre_prune = pruner.total_num_filters(conv_index=-1)
@@ -481,7 +488,6 @@ if __name__ == '__main__':
                 # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
                 # cudnn.benchmark = True
 
-            # net = net.module if isinstance(net, torch.nn.DataParallel) else net
             # create new pruner in each iteration
             pruner = FilterPruner(net.module if isinstance(net, torch.nn.DataParallel) else net)
             total_filter_num_pre_prune = pruner.total_num_filters(conv_index=-1)

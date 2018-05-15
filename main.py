@@ -20,7 +20,7 @@ from torch.autograd import Variable
 
 os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
-use_cuda = 0# torch.cuda.is_available()
+use_cuda = torch.cuda.is_available()
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 total_filter_num_pre_prune = 0
 
@@ -206,8 +206,9 @@ class FilterPruner:
             values / (activation.size(0) * activation.size(2) * activation.size(3))
 
         if activation_index not in self.filter_ranks:  # set self.filter_ranks[activation_index]
-            self.filter_ranks[activation_index] = \
-                torch.FloatTensor(activation.size(1)).zero_().cuda()
+            self.filter_ranks[activation_index] = torch.FloatTensor(activation.size(1)).zero_()
+            if use_cuda:
+                self.filter_ranks[activation_index] = self.filter_ranks[activation_index].cuda()
 
         self.filter_ranks[activation_index] += values
         self.grad_index += 1
@@ -308,11 +309,20 @@ class FilterPruner:
 
             print("Layers that will be pruned", num_layers_pruned)
             print("..............Pruning filters............. ")
-            model = self.model.cpu()
+            if use_cuda:
+                model = self.model.cpu()
+            else:
+                model = self.model
+
             for layer_index, filter_index in prune_targets:
                 model = prune_conv_layer(model, layer_index, filter_index)
 
-            self.model = model.cuda()
+            self.model = model
+            if use_cuda:
+                self.model = model.cuda()
+                # self.model = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
+                cudnn.benchmark = True
+
             optimizer = optim.SGD(self.model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
             print("%d / %d Filters remain." % (pruner.total_num_filters(activation_index), number_of_filters))
@@ -370,9 +380,9 @@ if __name__ == '__main__':
         acc = checkpoint['acc']
         # start_epoch = checkpoint['epoch']
 
-    if use_cuda and not args.test_pruned:
+    if use_cuda:
         net.cuda()
-        net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
+        # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
         cudnn.benchmark = True
 
     criterion = nn.CrossEntropyLoss()
@@ -403,7 +413,7 @@ if __name__ == '__main__':
             save(acc, activation_index)
             pass
     elif args.train or args.resume:
-        for epoch in range(50):  # start_epoch, start_epoch + 20):
+        for epoch in range(100):  # start_epoch, start_epoch + 20):
             print('\nEpoch: %d' % epoch)
             train()
             acc = test()
@@ -418,9 +428,9 @@ if __name__ == '__main__':
             checkpoint = torch.load('./checkpoint/ckpt.train')
             net = checkpoint['net']
             acc = checkpoint['acc']
-            net = net.module if isinstance(net, torch.nn.DataParallel) else net
+            # net = net.module if isinstance(net, torch.nn.DataParallel) else net
             # create new pruner in each iteration
-            pruner = FilterPruner(net)
+            pruner = FilterPruner(net.module if isinstance(net, torch.nn.DataParallel) else net)
             total_filter_num_pre_prune = pruner.total_num_filters(activation_index=-1)
 
             data = test(activation_index)
@@ -431,9 +441,9 @@ if __name__ == '__main__':
             checkpoint = torch.load('./checkpoint/ckpt.prune_layer_' + str(activation_index))
             net = checkpoint['net']
             acc = checkpoint['acc']
-            net = net.module if isinstance(net, torch.nn.DataParallel) else net
+            # net = net.module if isinstance(net, torch.nn.DataParallel) else net
             # create new pruner in each iteration
-            pruner = FilterPruner(net)
+            pruner = FilterPruner(net.module if isinstance(net, torch.nn.DataParallel) else net)
             total_filter_num_pre_prune = pruner.total_num_filters(activation_index=-1)
 
             data = test(activation_index)

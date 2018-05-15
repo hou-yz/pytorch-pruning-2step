@@ -170,4 +170,4 @@ def prune_conv_layer(model, layer_index, filter_index):
         del conv
         model.classifier = classifier
 
-    return model
+    return # model

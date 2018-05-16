@@ -6,8 +6,6 @@ import numpy as np
 import os
 import time
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
 
 def replace_layers(model, i, indexes, layers):
     if i in indexes:

@@ -1,28 +1,35 @@
-'''Train CIFAR10 with PyTorch.'''
-from __future__ import print_function
+'''
+Train & Pruning with PyTorch by hou-yz.
+forked from kuangliu/pytorch-cifar;
+
+
+'''
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
+from torch.autograd import Variable
+import torchvision
+import torchvision.transforms as transforms
+import os
 from heapq import nsmallest
 from operator import itemgetter
 import json
-import torchvision
-import torchvision.transforms as transforms
 import numpy as np
-import os
 import argparse
-from model_refactor import *
 from models import *
-from torch.autograd import Variable
+from model_refactor import *
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+if os.name == 'nt': # windows
+    num_workers=0
+    # os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+else: # linux
+    num_workers=8
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 use_cuda = torch.cuda.is_available()
-start_epoch = 0  # start from epoch 0 or last checkpoint epoch
+start_epoch = 1  # start from epoch 0 or last checkpoint epoch
 total_filter_num_pre_prune = 0
+
 
 # Data
 print('==> Preparing data..')
@@ -39,10 +46,10 @@ transform_test = transforms.Compose([
 ])
 
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=8)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=num_workers)
 
 testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=False, num_workers=8)
+testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=False, num_workers=num_workers)
 
 classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
@@ -50,7 +57,7 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 # Training
 def train(optimizer=None, rankfilters=False):
     if optimizer is None:
-        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+        optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
     # net.train()
     train_loss = 0
     correct = 0
@@ -124,7 +131,7 @@ def test(log_index=-1):
 
 
 # save
-def save(acc, conv_index=-1):
+def save(acc, conv_index=-1, epoch=-1):
     print('Saving..')
     try:
         # save the cpu model
@@ -133,7 +140,7 @@ def save(acc, conv_index=-1):
             'net': model.cpu() if use_cuda else model,
             'acc': acc,
             'conv_index': conv_index,
-            # 'epoch': epoch if 'epoch' in globals(),
+            'epoch': epoch,
         }
     except:
         pass
@@ -143,8 +150,10 @@ def save(acc, conv_index=-1):
         torch.save(state, './checkpoint/ckpt.prune')
     elif args.prune_layer and conv_index != -1:
         torch.save(state, './checkpoint/ckpt.prune_layer_%d' % conv_index)
+    elif epoch!=-1:
+        torch.save(state, './checkpoint/ckpt.train.epoch_'+str(epoch))
     else:
-        torch.save(state, './checkpoint/ckpt.train')
+        save(state, './checkpoint/ckpt.train')
 
     # restore the cuda or cpu model
     if use_cuda:
@@ -350,12 +359,12 @@ class FilterPruner:
             # else:
             #     self.model = model
 
-            optimizer = optim.SGD(self.model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+            optimizer = torch.optim.SGD(self.model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
             print("%d / %d Filters remain." % (pruner.total_num_filters(conv_index), number_of_filters))
             # test()
             print("Fine tuning to recover from pruning iteration.")
-            for epoch in range(1):
+            for epoch in range(2):
                 train(optimizer)
             acc = test()
             pass
@@ -372,6 +381,7 @@ class FilterPruner:
 def get_args():
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
+    parser.add_argument('--epoch', default=10, type=int, help='epoch')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument("--train", dest="train", action="store_true")
     parser.add_argument("--prune", dest="prune", action="store_true")
@@ -405,7 +415,7 @@ if __name__ == '__main__':
         checkpoint = torch.load('./checkpoint/ckpt.train')
         net = checkpoint['net']
         acc = checkpoint['acc']
-        # start_epoch = checkpoint['epoch']
+        start_epoch = checkpoint['epoch'] + 1
 
     if use_cuda:
         net.cuda()
@@ -413,7 +423,7 @@ if __name__ == '__main__':
         # cudnn.benchmark = True
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+    optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
     pruner = FilterPruner(net.module if isinstance(net, torch.nn.DataParallel) else net)
     total_filter_num_pre_prune = pruner.total_num_filters(conv_index=-1)
@@ -445,12 +455,12 @@ if __name__ == '__main__':
             save(acc, conv_index)
             pass
     elif args.train or args.resume:
-        for epoch in range(100):  # start_epoch, start_epoch + 20):
+        for epoch in range(start_epoch, start_epoch + args.epoch):
             print('\nEpoch: %d' % epoch)
             train()
             acc = test()
             if epoch % 10 ==0:
-                save(acc)
+                save(acc,-1,epoch)
                 pass
         save(acc)
     elif args.test_pruned:

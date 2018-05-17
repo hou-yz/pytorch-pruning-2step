@@ -114,14 +114,15 @@ def test(log_index=-1):
 
     if log_index != -1:
         delta_t, delta_t_computations, bandwidth, all_conv_computations = pruner.forward_n_track(inputs, log_index)
+        cfg = pruner.get_cfg()
         data = {
             'acc': acc,
             'delta_t': delta_t,
             'delta_t_computations': int(delta_t_computations),
             'bandwidth': int(bandwidth),
             'all_conv_computations': int(all_conv_computations),
-            'conv_index': log_index,
-            'config': pruner.get_cfg()
+            'layer_cfg': cfg[log_index],
+            'config': cfg
             # 'epoch': epoch if 'epoch' in globals(),
         }
         return data

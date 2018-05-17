@@ -1,10 +1,7 @@
 
 *.gz
 *.meta
-data/cifar-10-batches-py/data_batch_1
-.idea/misc.xml
-.idea/deployment.xml
-.idea/dictionaries/Johnny.xml
+.idea/
 *.xml
 *.iml
 *.pyc
@@ -12,5 +9,4 @@ data/
 train/
 checkpoint/
 checkpoint_backup/
-
-~$log.xlsx
+*.xlsx

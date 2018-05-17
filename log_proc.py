@@ -7,14 +7,14 @@ with open('./checkpoint/log_original.json') as fp:
 with open('./checkpoint/log_pruned.json') as fp:
     pruned_data=json.load(fp)
 
-index=['']
+layer_cfg=['']
 acc=['acc_original']
 delta_t=['time_original']
 delta_t_computations=['']
 bandwidth=['bandwidth_original']
 all_conv_computations=['']
 for data in original_data:
-    index.append(data['activation_index'])
+    layer_cfg.append(data['conv_index'])
     acc.append(data['acc'])
     delta_t.append(data['delta_t'])
     delta_t_computations.append(data['delta_t_computations'])
@@ -23,21 +23,21 @@ for data in original_data:
 
 wb = Workbook()
 ws = wb.create_sheet("original", 0)
-ws.append(index)
+ws.append(layer_cfg)
 ws.append(acc)
 ws.append(delta_t)
 ws.append(delta_t_computations)
 ws.append(bandwidth)
 ws.append(all_conv_computations)
 
-index=['']
+layer_cfg=['']
 acc=['acc_pruned']
 delta_t=['time_pruned']
 delta_t_computations=['']
 bandwidth=['bandwidth_pruned']
 all_conv_computations=['']
 for data in pruned_data:
-    index.append(data['activation_index'])
+    layer_cfg.append(data['conv_index'])
     acc.append(data['acc'])
     delta_t.append(data['delta_t'])
     delta_t_computations.append(data['delta_t_computations'])
@@ -45,7 +45,7 @@ for data in pruned_data:
     all_conv_computations.append(data['all_conv_computations'])
 
 ws = wb.create_sheet("pruned", 0)
-ws.append(index)
+ws.append(layer_cfg)
 ws.append(acc)
 ws.append(delta_t)
 ws.append(delta_t_computations)

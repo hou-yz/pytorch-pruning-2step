@@ -153,7 +153,7 @@ def save(acc, conv_index=-1, epoch=-1):
     elif epoch!=-1:
         torch.save(state, './checkpoint/ckpt.train.epoch_'+str(epoch))
     else:
-        save(state, './checkpoint/ckpt.train')
+        torch.save(state, './checkpoint/ckpt.train')
 
     # restore the cuda or cpu model
     if use_cuda:

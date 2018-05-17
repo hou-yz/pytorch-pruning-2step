@@ -2,9 +2,9 @@ import json
 from openpyxl import Workbook
 
 
-with open('./checkpoint/log_original.json') as fp:
+with open('./log_original.json') as fp:
     original_data=json.load(fp)
-with open('./checkpoint/log_pruned.json') as fp:
+with open('./log_pruned.json') as fp:
     pruned_data=json.load(fp)
 
 layer_cfg=['']
@@ -14,7 +14,7 @@ delta_t_computations=['']
 bandwidth=['bandwidth_original']
 all_conv_computations=['']
 for data in original_data:
-    layer_cfg.append(data['conv_index'])
+    layer_cfg.append(data['layer_cfg'])
     acc.append(data['acc'])
     delta_t.append(data['delta_t'])
     delta_t_computations.append(data['delta_t_computations'])
@@ -37,7 +37,7 @@ delta_t_computations=['']
 bandwidth=['bandwidth_pruned']
 all_conv_computations=['']
 for data in pruned_data:
-    layer_cfg.append(data['conv_index'])
+    layer_cfg.append(data['layer_cfg'])
     acc.append(data['acc'])
     delta_t.append(data['delta_t'])
     delta_t_computations.append(data['delta_t_computations'])

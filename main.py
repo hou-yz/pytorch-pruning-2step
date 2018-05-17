@@ -508,7 +508,7 @@ if __name__ == '__main__':
                 if not isinstance(cfg[index + 1], str):
                     last_conv_index += 1
 
-        with open('./checkpoint/log_original.json', 'w') as fp:
+        with open('./log_original.json', 'w') as fp:
             json.dump(original_data, fp, indent=2)
-        with open('./checkpoint/log_pruned.json', 'w') as fp:
+        with open('./log_pruned.json', 'w') as fp:
             json.dump(pruned_data, fp, indent=2)

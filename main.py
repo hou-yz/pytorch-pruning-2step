@@ -19,17 +19,16 @@ import argparse
 from models import *
 from model_refactor import *
 
-if os.name == 'nt': # windows
-    num_workers=0
+if os.name == 'nt':  # windows
+    num_workers = 0
     # os.environ["CUDA_VISIBLE_DEVICES"] = '0'
-else: # linux
-    num_workers=8
+else:  # linux
+    num_workers = 8
     os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 use_cuda = torch.cuda.is_available()
 start_epoch = 1  # start from epoch 0 or last checkpoint epoch
 total_filter_num_pre_prune = 0
-
 
 # Data
 print('==> Preparing data..')
@@ -81,7 +80,7 @@ def train(optimizer=None, rankfilters=False):
             # except TypeError:
             #     pass
 
-        train_loss += loss.data[0] # item()
+        train_loss += loss.data[0]  # item()
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
@@ -105,7 +104,7 @@ def test(log_index=-1):
         outputs = net(inputs)
         loss = criterion(outputs, targets)
 
-        test_loss += loss.data[0] # loss.item()
+        test_loss += loss.data[0]  # loss.item()
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
@@ -150,8 +149,8 @@ def save(acc, conv_index=-1, epoch=-1):
         torch.save(state, './checkpoint/ckpt.prune')
     elif args.prune_layer and conv_index != -1:
         torch.save(state, './checkpoint/ckpt.prune_layer_%d' % conv_index)
-    elif epoch!=-1:
-        torch.save(state, './checkpoint/ckpt.train.epoch_'+str(epoch))
+    elif epoch != -1:
+        torch.save(state, './checkpoint/ckpt.train.epoch_' + str(epoch))
     else:
         torch.save(state, './checkpoint/ckpt.train')
 
@@ -351,7 +350,6 @@ class FilterPruner:
             for layer_index, filter_index in prune_targets:
                 prune_conv_layer(self.model, layer_index, filter_index)
 
-
             if use_cuda:
                 self.model.cuda()
                 # self.model = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
@@ -459,8 +457,8 @@ if __name__ == '__main__':
             print('\nEpoch: %d' % epoch)
             train()
             acc = test()
-            if epoch % 10 ==0:
-                save(acc,-1,epoch)
+            if epoch % 10 == 0:
+                save(acc, -1, epoch)
                 pass
         save(acc)
     elif args.test_pruned:
@@ -469,7 +467,7 @@ if __name__ == '__main__':
         original_data = []
         pruned_data = []
 
-        last_conv_index = 0  # log for checkpoint restoring
+        last_conv_index = 0  # log for checkpoint restoring, nearest conv layer
         for index in range(len(cfg)):
             print('==> Resuming from checkpoint..')
             assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
@@ -505,8 +503,9 @@ if __name__ == '__main__':
             data = test(index)
             pruned_data.append(data)
 
-            if not isinstance(cfg[index], str):
-                last_conv_index += 1
+            if index + 1 < len(cfg):
+                if not isinstance(cfg[index + 1], str):
+                    last_conv_index += 1
 
         with open('./checkpoint/log_original.json', 'w') as fp:
             json.dump(original_data, fp, indent=2)

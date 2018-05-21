@@ -1,8 +1,5 @@
 '''
 Train & Pruning with PyTorch by hou-yz.
-forked from kuangliu/pytorch-cifar;
-
-
 '''
 
 import torch
@@ -11,6 +8,7 @@ from torch.autograd import Variable
 import torchvision
 import torchvision.transforms as transforms
 import os
+import math
 from heapq import nsmallest
 from operator import itemgetter
 import json
@@ -21,7 +19,6 @@ from model_refactor import *
 
 if os.name == 'nt':  # windows
     num_workers = 0
-    # os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 else:  # linux
     num_workers = 8
     os.environ["CUDA_VISIBLE_DEVICES"] = '1'
@@ -76,18 +73,12 @@ def train(optimizer=None, rankfilters=False):
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
-            # try:
-            #     optimizer.step()
-            # except TypeError:
-            #     pass
 
         train_loss += loss.data[0]  # item()
         _, predicted = torch.max(outputs.data, 1)
         total += targets.size(0)
         correct += predicted.eq(targets.data).cpu().sum()
 
-        # progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-        #              % (train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
     print('Train Loss: %.3f | Acc: %.3f%% (%d/%d)'
           % (train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
@@ -121,11 +112,9 @@ def test(log_index=-1):
             inputs, targets = inputs.cuda(), targets.cuda()
         # get profile
         with torch.autograd.profiler.profile() as prof:
-            # delta_t, delta_t_computations, bandwidth, all_conv_computations = pruner.forward_n_track(Variable(inputs), log_index)
             net(Variable(inputs))
             # print(next(net.parameters()).is_cuda)
-        delta_t, delta_t_computations, bandwidth0, all_conv_computations = pruner.forward_n_track(Variable(inputs),
-                                                                                                  log_index)
+        pruner.forward_n_track(Variable(inputs), log_index)
         cfg = pruner.get_cfg()
 
         # get log for time/bandwidth
@@ -133,8 +122,8 @@ def test(log_index=-1):
         bandwidths = []
         for i in range(len(cfg)):
             delta_ts.append(
-                sum(item.cpu_time for item in prof.function_events[:pruner.conv_n_pool_to_layer[i]]) / np.power(10,
-                                                                                                                9) / batch_size)
+                sum(item.cpu_time for item in prof.function_events[:pruner.conv_n_pool_to_layer[i]]) /
+                np.power(10, 9) / batch_size)
             if isinstance(cfg[i], int):
                 bandwidths.append(
                     int(cfg[i] * (inputs.shape[2] * inputs.shape[3]) / np.power(4, cfg[:i + 1].count('M'))))
@@ -145,16 +134,12 @@ def test(log_index=-1):
         data = {
             'acc': acc if use_cuda else -1,
             'index': log_index,
-            # 'delta_t': delta_t,
             'delta_t_prof': delta_ts[log_index],
             'delta_ts': delta_ts,
-            # 'delta_t_computations': int(delta_t_computations),
             'bandwidth': bandwidths[log_index],
             'bandwidths': bandwidths,
-            # 'all_conv_computations': int(all_conv_computations),
             'layer_cfg': cfg[log_index],
             'config': cfg
-            # 'epoch': epoch if 'epoch' in globals(),
         }
         return data
 
@@ -197,10 +182,6 @@ class FilterPruner:
         self.reset()
 
     def reset(self):
-        # self.activations = []
-        # self.gradients = []
-        # self.grad_index = 0
-        # self.activation_to_layer = {}
         self.filter_ranks = {}
 
     # forward method that gives "compute_rank" a hook
@@ -350,14 +331,7 @@ class FilterPruner:
 
         number_of_filters = pruner.total_num_filters(conv_index)
 
-        num_filters_to_prune_per_iteration = max(int(number_of_filters / 16), 2)
-        # iterations = int(float(number_of_filters) / num_filters_to_prune_per_iteration)
-        #
-        # iterations = int(iterations * 2.0 / 3)
-        #
-        # print("Number of pruning iterations to reduce 67% filters", iterations)
-
-        # for _ in range(iterations):
+        num_filters_to_prune_per_iteration = math.ceil(number_of_filters / 16)
         while acc > acc_pre_prune * 0.95 and pruner.total_num_filters(conv_index) / number_of_filters > 0.2:
             # print("Ranking filters.. ")
 
@@ -372,8 +346,6 @@ class FilterPruner:
             print("..............Pruning filters............. ")
             if use_cuda:
                 self.model.cpu()
-            # else:
-            #     model = self.model
 
             for layer_index, filter_index in prune_targets:
                 prune_conv_layer(self.model, layer_index, filter_index)
@@ -382,8 +354,6 @@ class FilterPruner:
                 self.model.cuda()
                 # self.model = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
                 # cudnn.benchmark = True
-            # else:
-            #     self.model = model
 
             optimizer = torch.optim.SGD(self.model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
@@ -460,6 +430,7 @@ if __name__ == '__main__':
         save(acc)
         pass
     elif args.prune_layer:
+        # this is after --prune the whole model
         conv_index_max = pruner.get_conv_index_max()
         for conv_index in range(conv_index_max):
             print('==> Resuming from checkpoint..')
@@ -478,8 +449,6 @@ if __name__ == '__main__':
 
             # prune given layer
             pruner.prune(conv_index)
-            # prune the whole model
-            # pruner.prune()
             acc = test()
             save(acc, conv_index)
             pass

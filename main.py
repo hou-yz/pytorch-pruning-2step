@@ -29,6 +29,7 @@ else:  # linux
 use_cuda = torch.cuda.is_available()
 start_epoch = 1  # start from epoch 0 or last checkpoint epoch
 total_filter_num_pre_prune = 0
+batch_size = 128
 
 # Data
 print('==> Preparing data..')
@@ -45,10 +46,10 @@ transform_test = transforms.Compose([
 ])
 
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True, num_workers=num_workers)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
 testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size=32, shuffle=False, num_workers=num_workers)
+testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
 classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
@@ -116,19 +117,41 @@ def test(log_index=-1):
 
     if log_index != -1:
         (inputs, targets) = list(testloader)[0]
+        if use_cuda:
+            inputs, targets = inputs.cuda(), targets.cuda()
+        # get profile
         with torch.autograd.profiler.profile() as prof:
-            delta_t, delta_t_computations, bandwidth, all_conv_computations = pruner.forward_n_track(Variable(inputs),
-                                                                                                     log_index)
-        delta_t_prof = sum(item.cpu_time for item in prof.function_events[:pruner.conv_n_pool_to_layer[log_index]])
+            # delta_t, delta_t_computations, bandwidth, all_conv_computations = pruner.forward_n_track(Variable(inputs), log_index)
+            net(Variable(inputs))
+            # print(next(net.parameters()).is_cuda)
+        delta_t, delta_t_computations, bandwidth0, all_conv_computations = pruner.forward_n_track(Variable(inputs),
+                                                                                                  log_index)
         cfg = pruner.get_cfg()
+
+        # get log for time/bandwidth
+        delta_ts = []
+        bandwidths = []
+        for i in range(len(cfg)):
+            delta_ts.append(
+                sum(item.cpu_time for item in prof.function_events[:pruner.conv_n_pool_to_layer[i]]) / np.power(10,
+                                                                                                                9) / batch_size)
+            if isinstance(cfg[i], int):
+                bandwidths.append(
+                    int(cfg[i] * (inputs.shape[2] * inputs.shape[3]) / np.power(4, cfg[:i + 1].count('M'))))
+            else:
+                bandwidths.append(
+                    int(cfg[i - 1] * (inputs.shape[2] * inputs.shape[3]) / np.power(4, cfg[:i + 1].count('M'))))
+
         data = {
             'acc': acc if use_cuda else -1,
-            # 'prof': prof,
-            'delta_t': delta_t,
-            'delta_t_prof': delta_t_prof / np.power(10, 9),
-            'delta_t_computations': int(delta_t_computations),
-            'bandwidth': int(bandwidth),
-            'all_conv_computations': int(all_conv_computations),
+            'index': log_index,
+            # 'delta_t': delta_t,
+            'delta_t_prof': delta_ts[log_index],
+            'delta_ts': delta_ts,
+            # 'delta_t_computations': int(delta_t_computations),
+            'bandwidth': bandwidths[log_index],
+            'bandwidths': bandwidths,
+            # 'all_conv_computations': int(all_conv_computations),
             'layer_cfg': cfg[log_index],
             'config': cfg
             # 'epoch': epoch if 'epoch' in globals(),
@@ -240,14 +263,11 @@ class FilterPruner:
     def compute_rank(self, grad):
         conv_index = len(self.activations) - self.grad_index - 1
         activation = self.activations[conv_index]
-        values = \
-            torch.sum((activation * grad), dim=0, keepdim=True). \
-                sum(dim=2, keepdim=True).sum(dim=3, keepdim=True)[0, :, 0,
-            0].data  # compute the total 1st order taylor for each filters in a given layer
+        values = torch.sum((activation * grad), dim=0, keepdim=True).sum(dim=2, keepdim=True).sum(dim=3, keepdim=True)[
+                 0, :, 0, 0].data  # compute the total 1st order taylor for each filters in a given layer
 
         # Normalize the rank by the filter dimensions
-        values = \
-            values / (activation.size(0) * activation.size(2) * activation.size(3))
+        values = values / (activation.size(0) * activation.size(2) * activation.size(3))
 
         if conv_index not in self.filter_ranks:  # set self.filter_ranks[conv_index]
             self.filter_ranks[conv_index] = torch.FloatTensor(activation.size(1)).zero_()
@@ -330,10 +350,7 @@ class FilterPruner:
 
         number_of_filters = pruner.total_num_filters(conv_index)
 
-        if conv_index == -1:
-            num_filters_to_prune_per_iteration = 512
-        else:
-            num_filters_to_prune_per_iteration = int(number_of_filters / 16)
+        num_filters_to_prune_per_iteration = max(int(number_of_filters / 16), 2)
         # iterations = int(float(number_of_filters) / num_filters_to_prune_per_iteration)
         #
         # iterations = int(iterations * 2.0 / 3)
@@ -438,13 +455,16 @@ if __name__ == '__main__':
     total_filter_num_pre_prune = pruner.total_num_filters(conv_index=-1)
 
     if args.prune:
-        pruner.prune(conv_index=-1)
+        pruner.prune()
+        acc = test()
+        save(acc)
+        pass
     elif args.prune_layer:
         conv_index_max = pruner.get_conv_index_max()
         for conv_index in range(conv_index_max):
             print('==> Resuming from checkpoint..')
             assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-            checkpoint = torch.load('./checkpoint/ckpt.train')
+            checkpoint = torch.load('./checkpoint/ckpt.prune')
             net = checkpoint['net']
             acc = checkpoint['acc']
             if use_cuda:
@@ -459,7 +479,7 @@ if __name__ == '__main__':
             # prune given layer
             pruner.prune(conv_index)
             # prune the whole model
-            pruner.prune()
+            # pruner.prune()
             acc = test()
             save(acc, conv_index)
             pass
@@ -473,6 +493,7 @@ if __name__ == '__main__':
                 pass
         save(acc)
     elif args.test_pruned:
+        # use_cuda = 0
         cfg = pruner.get_cfg()
         conv_index_max = pruner.get_conv_index_max()
         original_data = []
@@ -480,6 +501,7 @@ if __name__ == '__main__':
 
         last_conv_index = 0  # log for checkpoint restoring, nearest conv layer
         for index in range(len(cfg)):
+            # original
             print('==> Resuming from checkpoint..')
             assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
             checkpoint = torch.load('./checkpoint/ckpt.train')
@@ -495,11 +517,15 @@ if __name__ == '__main__':
             total_filter_num_pre_prune = pruner.total_num_filters(conv_index=-1)
 
             data = test(index)
+            if data['acc'] == -1:
+                data['acc'] = acc
             original_data.append(data)
 
+            # pruned
             print('==> Resuming from checkpoint..')
             assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
             checkpoint = torch.load('./checkpoint/ckpt.prune_layer_' + str(last_conv_index))
+            # checkpoint = torch.load('./checkpoint/ckpt.prune')
             net = checkpoint['net']
             acc = checkpoint['acc']
             if use_cuda:

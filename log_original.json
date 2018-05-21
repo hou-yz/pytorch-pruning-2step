@@ -1,6 +1,8 @@
 [
   {
-    "layer_cfg": 64,
+    "delta_t": 0.04166674613952637,
+    "delta_t_prof": 0.026463762,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -21,14 +23,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0017380714416503906,
-    "bandwidth": 65536,
     "all_conv_computations": 307712,
+    "bandwidth": 65536,
+    "layer_cfg": 64,
     "delta_t_computations": 65536
   },
   {
-    "layer_cfg": 64,
+    "delta_t": 0.08999967575073242,
+    "delta_t_prof": 0.080600017,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -49,14 +52,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0007665157318115234,
-    "bandwidth": 65536,
     "all_conv_computations": 307712,
+    "bandwidth": 65536,
+    "layer_cfg": 64,
     "delta_t_computations": 131072
   },
   {
-    "layer_cfg": "M",
+    "delta_t": 0.08823657035827637,
+    "delta_t_prof": 0.08516009,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -77,14 +81,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.001196146011352539,
-    "bandwidth": 16384,
     "all_conv_computations": 307712,
+    "bandwidth": 16384,
+    "layer_cfg": "M",
     "delta_t_computations": 147456
   },
   {
-    "layer_cfg": 128,
+    "delta_t": 0.14580702781677246,
+    "delta_t_prof": 0.13749396,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -105,14 +110,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0009703636169433594,
-    "bandwidth": 32768,
     "all_conv_computations": 307712,
+    "bandwidth": 32768,
+    "layer_cfg": 128,
     "delta_t_computations": 180224
   },
   {
-    "layer_cfg": 128,
+    "delta_t": 0.22054553031921387,
+    "delta_t_prof": 0.209974006,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -133,14 +139,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0009946823120117188,
-    "bandwidth": 32768,
     "all_conv_computations": 307712,
+    "bandwidth": 32768,
+    "layer_cfg": 128,
     "delta_t_computations": 212992
   },
   {
-    "layer_cfg": "M",
+    "delta_t": 0.24586129188537598,
+    "delta_t_prof": 0.242732185,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -161,14 +168,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0009951591491699219,
-    "bandwidth": 8192,
     "all_conv_computations": 307712,
+    "bandwidth": 8192,
+    "layer_cfg": "M",
     "delta_t_computations": 221184
   },
   {
-    "layer_cfg": 256,
+    "delta_t": 0.2333223819732666,
+    "delta_t_prof": 0.226356066,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -189,14 +197,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0013055801391601562,
-    "bandwidth": 16384,
     "all_conv_computations": 307712,
+    "bandwidth": 16384,
+    "layer_cfg": 256,
     "delta_t_computations": 237568
   },
   {
-    "layer_cfg": 256,
+    "delta_t": 0.303997278213501,
+    "delta_t_prof": 0.298154608,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -217,14 +226,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.001493215560913086,
-    "bandwidth": 16384,
     "all_conv_computations": 307712,
+    "bandwidth": 16384,
+    "layer_cfg": 256,
     "delta_t_computations": 253952
   },
   {
-    "layer_cfg": 256,
+    "delta_t": 0.40821123123168945,
+    "delta_t_prof": 0.400394322,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -245,14 +255,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0018129348754882812,
-    "bandwidth": 16384,
     "all_conv_computations": 307712,
+    "bandwidth": 16384,
+    "layer_cfg": 256,
     "delta_t_computations": 270336
   },
   {
-    "layer_cfg": "M",
+    "delta_t": 0.36693382263183594,
+    "delta_t_prof": 0.363665209,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -273,14 +284,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.001664876937866211,
-    "bandwidth": 4096,
     "all_conv_computations": 307712,
+    "bandwidth": 4096,
+    "layer_cfg": "M",
     "delta_t_computations": 274432
   },
   {
-    "layer_cfg": 512,
+    "delta_t": 0.419283390045166,
+    "delta_t_prof": 0.413725924,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -301,14 +313,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0020143985748291016,
-    "bandwidth": 8192,
     "all_conv_computations": 307712,
+    "bandwidth": 8192,
+    "layer_cfg": 512,
     "delta_t_computations": 282624
   },
   {
-    "layer_cfg": 512,
+    "delta_t": 0.49259185791015625,
+    "delta_t_prof": 0.48704858,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -329,14 +342,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.002228260040283203,
-    "bandwidth": 8192,
     "all_conv_computations": 307712,
+    "bandwidth": 8192,
+    "layer_cfg": 512,
     "delta_t_computations": 290816
   },
   {
-    "layer_cfg": 512,
+    "delta_t": 0.5584101676940918,
+    "delta_t_prof": 0.551691375,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -357,14 +371,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0023140907287597656,
-    "bandwidth": 8192,
     "all_conv_computations": 307712,
+    "bandwidth": 8192,
+    "layer_cfg": 512,
     "delta_t_computations": 299008
   },
   {
-    "layer_cfg": "M",
+    "delta_t": 0.5797133445739746,
+    "delta_t_prof": 0.576272103,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -385,14 +400,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0022873878479003906,
-    "bandwidth": 2048,
     "all_conv_computations": 307712,
+    "bandwidth": 2048,
+    "layer_cfg": "M",
     "delta_t_computations": 301056
   },
   {
-    "layer_cfg": 512,
+    "delta_t": 0.6328587532043457,
+    "delta_t_prof": 0.628359448,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -413,14 +429,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0022013187408447266,
-    "bandwidth": 2048,
     "all_conv_computations": 307712,
+    "bandwidth": 2048,
+    "layer_cfg": 512,
     "delta_t_computations": 303104
   },
   {
-    "layer_cfg": 512,
+    "delta_t": 0.6737778186798096,
+    "delta_t_prof": 0.668405283,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -441,14 +458,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.003576993942260742,
-    "bandwidth": 2048,
     "all_conv_computations": 307712,
+    "bandwidth": 2048,
+    "layer_cfg": 512,
     "delta_t_computations": 305152
   },
   {
-    "layer_cfg": 512,
+    "delta_t": 0.7936902046203613,
+    "delta_t_prof": 0.787822895,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -469,14 +487,15 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0029489994049072266,
-    "bandwidth": 2048,
     "all_conv_computations": 307712,
+    "bandwidth": 2048,
+    "layer_cfg": 512,
     "delta_t_computations": 307200
   },
   {
-    "layer_cfg": "M",
+    "delta_t": 0.7576789855957031,
+    "delta_t_prof": 0.752656023,
+    "acc": -1,
     "config": [
       64,
       64,
@@ -497,10 +516,9 @@
       512,
       "M"
     ],
-    "acc": 88.23,
-    "delta_t": 0.0028142929077148438,
-    "bandwidth": 512,
     "all_conv_computations": 307712,
+    "bandwidth": 512,
+    "layer_cfg": "M",
     "delta_t_computations": 307712
   }
 ]

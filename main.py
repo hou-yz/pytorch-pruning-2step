@@ -45,10 +45,10 @@ transform_test = transforms.Compose([
 ])
 
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=num_workers)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True, num_workers=num_workers)
 
 testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=False, num_workers=num_workers)
+testloader = torch.utils.data.DataLoader(testset, batch_size=32, shuffle=False, num_workers=num_workers)
 
 classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
@@ -97,27 +97,35 @@ def test(log_index=-1):
     test_loss = 0
     correct = 0
     total = 0
-    for batch_idx, (inputs, targets) in enumerate(testloader):
-        if use_cuda:
-            inputs, targets = inputs.cuda(), targets.cuda()
-        inputs, targets = Variable(inputs, volatile=True), Variable(targets)
-        outputs = net(inputs)
-        loss = criterion(outputs, targets)
+    if log_index == -1 or use_cuda:
+        for batch_idx, (inputs, targets) in enumerate(testloader):
+            if use_cuda:
+                inputs, targets = inputs.cuda(), targets.cuda()
+            inputs, targets = Variable(inputs, volatile=True), Variable(targets)
+            outputs = net(inputs)
+            loss = criterion(outputs, targets)
 
-        test_loss += loss.data[0]  # loss.item()
-        _, predicted = torch.max(outputs.data, 1)
-        total += targets.size(0)
-        correct += predicted.eq(targets.data).cpu().sum()
-    print('Test  Loss: %.3f | Acc: %.3f%% (%d/%d)'
-          % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
-    acc = 100. * correct / total
+            test_loss += loss.data[0]  # loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += targets.size(0)
+            correct += predicted.eq(targets.data).cpu().sum()
+
+        print('Test  Loss: %.3f | Acc: %.3f%% (%d/%d)' % (
+            test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+        acc = 100. * correct / total
 
     if log_index != -1:
-        delta_t, delta_t_computations, bandwidth, all_conv_computations = pruner.forward_n_track(inputs, log_index)
+        (inputs, targets) = list(testloader)[0]
+        with torch.autograd.profiler.profile() as prof:
+            delta_t, delta_t_computations, bandwidth, all_conv_computations = pruner.forward_n_track(Variable(inputs),
+                                                                                                     log_index)
+        delta_t_prof = sum(item.cpu_time for item in prof.function_events[:pruner.conv_n_pool_to_layer[log_index]])
         cfg = pruner.get_cfg()
         data = {
-            'acc': acc,
+            'acc': acc if use_cuda else -1,
+            # 'prof': prof,
             'delta_t': delta_t,
+            'delta_t_prof': delta_t_prof / np.power(10, 9),
             'delta_t_computations': int(delta_t_computations),
             'bandwidth': int(bandwidth),
             'all_conv_computations': int(all_conv_computations),
@@ -192,15 +200,17 @@ class FilterPruner:
 
     # forward method that tracks computation info
     def forward_n_track(self, x, log_index=-1):
+        self.conv_n_pool_to_layer = {}
 
         index = 0
         delta_t_computations = 0
-        all_conv_computations = 0
+        all_conv_computations = 0  # num of conv computations to the given layer
         t0 = time.time()
         for layer, (name, module) in enumerate(self.model.features._modules.items()):
             x = module(x)
             if isinstance(module, torch.nn.modules.ReLU) or isinstance(module, torch.nn.modules.MaxPool2d):
                 all_conv_computations += np.prod(x.data.shape[1:])
+                self.conv_n_pool_to_layer[index] = layer
                 if log_index == index:
                     delta_t = time.time() - t0
                     delta_t_computations = all_conv_computations

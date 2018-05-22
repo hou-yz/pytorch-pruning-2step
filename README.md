@@ -4,7 +4,6 @@ Based on kuangliu/pytorch-cifar;
 
 ## updates
 - added pruning features;
-- added log-processing with openpyxl(excel);
-- added cpu-only support;
-- windows support.
-
+- added 2-stage pruning method: --prune & --prune_layer
+- added draw_chart with openpyxl (in excel);
+- added cpu-only support and windows support.

@@ -26,7 +26,7 @@ else:  # linux
 use_cuda = torch.cuda.is_available()
 start_epoch = 1  # start from epoch 0 or last checkpoint epoch
 total_filter_num_pre_prune = 0
-batch_size = 128
+batch_size = 32
 
 # Data
 print('==> Preparing data..')
@@ -442,11 +442,9 @@ if __name__ == '__main__':
                 net.cuda()
                 # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
                 # cudnn.benchmark = True
-
             # create new pruner in each iteration
             pruner = FilterPruner(net.module if isinstance(net, torch.nn.DataParallel) else net)
             total_filter_num_pre_prune = pruner.total_num_filters(conv_index=-1)
-
             # prune given layer
             pruner.prune(conv_index)
             acc = test()
@@ -462,11 +460,12 @@ if __name__ == '__main__':
                 pass
         save(acc)
     elif args.test_pruned:
-        # use_cuda = 0
+        use_cuda = 0
         cfg = pruner.get_cfg()
         conv_index_max = pruner.get_conv_index_max()
         original_data = []
-        pruned_data = []
+        prune_data = []
+        prune_layer_data = []
 
         last_conv_index = 0  # log for checkpoint restoring, nearest conv layer
         for index in range(len(cfg)):
@@ -480,17 +479,33 @@ if __name__ == '__main__':
                 net.cuda()
                 # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
                 # cudnn.benchmark = True
-
             # create new pruner in each iteration
             pruner = FilterPruner(net.module if isinstance(net, torch.nn.DataParallel) else net)
             total_filter_num_pre_prune = pruner.total_num_filters(conv_index=-1)
-
             data = test(index)
             if data['acc'] == -1:
                 data['acc'] = acc
             original_data.append(data)
 
-            # pruned
+            # prune
+            print('==> Resuming from checkpoint..')
+            assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
+            checkpoint = torch.load('./checkpoint/ckpt.prune')
+            net = checkpoint['net']
+            acc = checkpoint['acc']
+            if use_cuda:
+                net.cuda()
+                # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
+                # cudnn.benchmark = True
+            # create new pruner in each iteration
+            pruner = FilterPruner(net.module if isinstance(net, torch.nn.DataParallel) else net)
+            total_filter_num_pre_prune = pruner.total_num_filters(conv_index=-1)
+            data = test(index)
+            if data['acc'] == -1:
+                data['acc'] = acc
+            prune_data.append(data)
+
+            # prune_layer
             print('==> Resuming from checkpoint..')
             assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
             checkpoint = torch.load('./checkpoint/ckpt.prune_layer_' + str(last_conv_index))
@@ -501,13 +516,13 @@ if __name__ == '__main__':
                 net.cuda()
                 # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
                 # cudnn.benchmark = True
-
             # create new pruner in each iteration
             pruner = FilterPruner(net.module if isinstance(net, torch.nn.DataParallel) else net)
             total_filter_num_pre_prune = pruner.total_num_filters(conv_index=-1)
-
             data = test(index)
-            pruned_data.append(data)
+            if data['acc'] == -1:
+                data['acc'] = acc
+                prune_layer_data.append(data)
 
             if index + 1 < len(cfg):
                 if not isinstance(cfg[index + 1], str):
@@ -515,5 +530,7 @@ if __name__ == '__main__':
 
         with open('./log_original.json', 'w') as fp:
             json.dump(original_data, fp, indent=2)
-        with open('./log_pruned.json', 'w') as fp:
-            json.dump(pruned_data, fp, indent=2)
+        with open('./log_prune.json', 'w') as fp:
+            json.dump(prune_data, fp, indent=2)
+        with open('./log_prune_layer.json', 'w') as fp:
+            json.dump(prune_layer_data, fp, indent=2)

@@ -9,4 +9,3 @@ data/
 train/
 checkpoint/
 checkpoint_backup/
-*.xlsx

@@ -20,20 +20,20 @@ python main.py --resume         # resume training
 ```
 
 - 2-step pruning:
-    first, in step-1, you can prune the whole model by
+first, in step-1, you can prune the whole model by
 ```lua 
 python main.py --prune          # prune the whole model
 ```
 
-    once you finished step-1, you can the prune each layer (step-2) individually for minimum bandwidth requirement with 
+once you finished step-1, you can the prune each layer (step-2) individually for minimum bandwidth requirement with 
 ``` lua
 python main.py --prune_layer    # prune layers and save models separately
 ```
 
 - for excel chart drawing ang logging, try 
 ```lua
-python maim.py --test_pruned    # test the pruned model and save .json logs
-python draw_chart.py            # use the .json logs to draw charts
+python maim.py --test_pruned    # test the pruned model and save *.json logs
+python draw_chart.py
 ```
 which automatically generate the `chart.xlsx` file.
 

@@ -119,7 +119,7 @@ for index in range(len(layer_cfg)):
     if isinstance(layer_cfg[index], int):
         layer_cfg[index] = 'conv'
     elif layer_cfg[index] == '' and index == 1:
-        layer_cfg[index] = 'og'
+        layer_cfg[index] = 'og image'
     elif layer_cfg[index] == '':
         pass
     else:

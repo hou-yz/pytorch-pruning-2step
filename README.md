@@ -10,7 +10,7 @@ improve inference speed and reduce intermediate feature sizes to favor distribut
 only support python3 with pytorch > 0.3.1; 
 model trained on cifar-10, tested only on vgg-16.
 
-also added auto logging and auto chart-drawing.
+also added auto-logging and auto chart-drawing.
 
 ## usage
 ### training:
@@ -26,12 +26,14 @@ first, in step-1, you can prune the whole model by
 python main.py --prune          # prune the whole model
 ```
 
-once you finished step-1, you can the prune each layer (step-2) individually for minimum bandwidth requirement with 
+once you finished step-1, you can then prune each layer (step-2) individually for minimum bandwidth requirement with 
 ``` lua
 python main.py --prune_layer    # prune layers and save models separately
 ```
 
-### for excel chart drawing ang logging, try 
+### chart drawing:
+
+for logging and excel chart drawing, try 
 ```lua
 python maim.py --test_pruned    # test the pruned model and save *.json logs
 python draw_chart.py

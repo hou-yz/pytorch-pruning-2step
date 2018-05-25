@@ -3,7 +3,7 @@ by hou-yz
 Based on kuangliu/pytorch-cifar;
 
 
-- improve inference speed and reduce intermediate feature sizes to favor distributed inference (local device compute half of the model and upload the feature for further computing on stronger devices or cloud).
+improve inference speed and reduce intermediate feature sizes to favor distributed inference (local device compute half of the model and upload the feature for further computing on stronger devices or cloud).
 
 - pruning stage-1: prune the whole model to increase inference speed and slightly reduce intermediate feature sizes.
 

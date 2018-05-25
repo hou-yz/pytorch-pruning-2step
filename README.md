@@ -13,13 +13,13 @@ model trained on cifar-10, tested only on vgg-16.
 also added auto logging and auto chart-drawing.
 
 ## usage
-- training:
+### training:
 ```lua
 python main.py --train          # train from scratch
 python main.py --resume         # resume training
 ```
 
-- 2-step pruning:
+### 2-step pruning:
 
 first, in step-1, you can prune the whole model by
 ```lua 
@@ -31,7 +31,7 @@ once you finished step-1, you can the prune each layer (step-2) individually for
 python main.py --prune_layer    # prune layers and save models separately
 ```
 
-- for excel chart drawing ang logging, try 
+### for excel chart drawing ang logging, try 
 ```lua
 python maim.py --test_pruned    # test the pruned model and save *.json logs
 python draw_chart.py

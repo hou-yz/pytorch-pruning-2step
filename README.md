@@ -20,6 +20,7 @@ python main.py --resume         # resume training
 ```
 
 - 2-step pruning:
+
 first, in step-1, you can prune the whole model by
 ```lua 
 python main.py --prune          # prune the whole model

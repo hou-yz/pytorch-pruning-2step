@@ -144,7 +144,7 @@ cats = Reference(ws, min_col=2, min_row=22, max_col=20)
 c1.set_categories(cats)
 
 c1.x_axis.title = 'layers'
-c1.y_axis.title = 'time elapsed (s)'
+c1.y_axis.title = 'time elapsed (ms)'
 c1.y_axis.majorGridlines = None
 c1.title = 'bandwidth/time'
 

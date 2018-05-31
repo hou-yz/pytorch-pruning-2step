@@ -123,7 +123,7 @@ def test(log_index=-1):
         for i in range(len(cfg)):
             delta_ts.append(
                 sum(item.cpu_time for item in prof.function_events[:pruner.conv_n_pool_to_layer[i]]) /
-                np.power(10, 9) / batch_size)
+                np.power(10, 6) / batch_size)
             if isinstance(cfg[i], int):
                 bandwidths.append(
                     int(cfg[i] * (inputs.shape[2] * inputs.shape[3]) / np.power(4, cfg[:i + 1].count('M'))))
